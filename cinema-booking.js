@@ -1,26 +1,39 @@
-jQuery(document).ready(function($) {
+/**
+ * Complete Cinema Booking System JavaScript
+ * Cinépolis-style movie theater booking functionality
+ */
+
+(function($) {
     'use strict';
 
     // Global variables
     let selectedSeats = [];
     let selectedShowtime = null;
     let bookingData = {};
+    let currentZoom = 1;
+    let seatSelectionModal = null;
 
-    // Initialize cinema booking system
-    init();
+    // Initialize when document is ready
+    $(document).ready(function() {
+        initializeCinemaBookingSystem();
+    });
 
-    function init() {
-        initMoviesFilter();
-        initShowtimeSelection();
+    function initializeCinemaBookingSystem() {
+        // Initialize all modules
+        initMoviesPage();
         initSeatSelection();
-        initSeatModal();
         initCartFunctionality();
-        initPaymentForm();
-        initModals();
+        initPaymentSystem();
+        initModalSystem();
+        initUserInteractions();
+        initUtilities();
+        
+        console.log('Cinema booking system initialized successfully');
     }
 
-    // Movies filter functionality
-    function initMoviesFilter() {
+    // ===== MOVIES PAGE FUNCTIONALITY =====
+    function initMoviesPage() {
+        // Movie filter tabs
         $('.filter-tab').on('click', function() {
             const filter = $(this).data('filter');
             
@@ -28,11 +41,10 @@ jQuery(document).ready(function($) {
             $('.filter-tab').removeClass('active');
             $(this).addClass('active');
             
-            // Filter movies
             filterMovies(filter);
         });
 
-        // Showtime date filters
+        // Showtime filters
         $('.filter-btn').on('click', function() {
             const dateFilter = $(this).data('date');
             
@@ -41,36 +53,50 @@ jQuery(document).ready(function($) {
             
             filterShowtimes(dateFilter);
         });
+
+        // Movie search
+        initMovieSearch();
+        
+        // Showtime selection
+        initShowtimeSelection();
     }
 
     function filterMovies(filter) {
         const $movies = $('.movie-card');
         
-        $movies.hide();
+        $movies.hide().removeClass('filtered-visible');
         
         switch(filter) {
             case 'now-playing':
-                $movies.filter('.now-playing').show();
+                $movies.filter('.now-playing').show().addClass('filtered-visible');
                 break;
             case 'coming-soon':
-                $movies.filter('.coming-soon').show();
+                $movies.filter('.coming-soon').show().addClass('filtered-visible');
                 break;
             case 'my-movies':
-                // Show user's favorite/watchlist movies
-                $movies.filter('[data-favorite="true"]').show();
+                $movies.filter('[data-favorite="true"], [data-watchlist="true"]').show().addClass('filtered-visible');
                 break;
             case 'all':
             default:
-                $movies.show();
+                $movies.show().addClass('filtered-visible');
                 break;
         }
+
+        // Animate filtered movies
+        $('.filtered-visible').each(function(index) {
+            $(this).css({
+                opacity: 0,
+                transform: 'translateY(20px)'
+            }).delay(index * 50).animate({
+                opacity: 1
+            }, 300, function() {
+                $(this).css('transform', 'translateY(0)');
+            });
+        });
     }
 
     function filterShowtimes(filter) {
         const $showtimes = $('.showtime-date');
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
         
         $showtimes.hide();
         
@@ -88,50 +114,100 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // Showtime selection
-    function initShowtimeSelection() {
-        $('.showtime-slot').on('click', function() {
-            const showtimeId = $(this).data('showtime-id');
-            const screen = $(this).data('screen');
-            const price = $(this).data('price');
+    function initMovieSearch() {
+        // Add search box if it doesn't exist
+        if (!$('#movie-search').length && $('.movies-filter').length) {
+            const searchHTML = `
+                <div class="movie-search-container">
+                    <input type="text" id="movie-search" placeholder="Search movies..." class="movie-search-input">
+                    <svg class="search-icon" width="20" height="20" fill="#666" viewBox="0 0 24 24">
+                        <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                    </svg>
+                </div>
+            `;
+            $('.movies-filter').append(searchHTML);
+        }
+
+        // Search functionality
+        $(document).on('input', '#movie-search, .movie-search-input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            const $movieCards = $('.movie-card');
             
+            if (searchTerm.length === 0) {
+                $movieCards.show();
+                return;
+            }
+            
+            $movieCards.each(function() {
+                const movieTitle = $(this).find('.movie-title a').text().toLowerCase();
+                const movieGenre = $(this).find('.movie-genre').text().toLowerCase();
+                
+                if (movieTitle.includes(searchTerm) || movieGenre.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+    }
+
+    function initShowtimeSelection() {
+        $(document).on('click', '.showtime-slot', function() {
+            const $slot = $(this);
+            const showtimeId = $slot.data('showtime-id');
+            const screen = $slot.data('screen');
+            const price = $slot.data('price');
+            const date = $slot.data('date');
+            const time = $slot.data('time');
+            
+            // Store showtime data
             selectedShowtime = {
                 id: showtimeId,
                 screen: screen,
                 price: price,
-                time: $(this).find('.showtime-time').text()
+                date: date,
+                time: time
             };
             
-            // Redirect to seat selection with showtime data
-            const seatSelectionUrl = '/seat-selection/?showtime=' + showtimeId;
-            window.location.href = seatSelectionUrl;
+            // Add loading state
+            $slot.addClass('loading').prop('disabled', true);
+            const originalText = $slot.find('.showtime-time').text();
+            $slot.find('.showtime-time').text('Loading...');
+            
+            // Redirect to seat selection
+            setTimeout(() => {
+                window.location.href = `/seat-selection/?showtime=${showtimeId}`;
+            }, 800);
         });
     }
 
-    // Seat selection functionality
+    // ===== SEAT SELECTION FUNCTIONALITY =====
     function initSeatSelection() {
         if (!$('.seat-map').length) return;
 
         const $seatMap = $('.seat-map');
         const showtimeId = $seatMap.data('showtime-id');
         
+        // Load any saved seat selection
+        loadSavedSeatSelection();
+        
         // Handle seat clicks
-        $('.seat.available').on('click', function() {
-            const seatNumber = $(this).data('seat');
-            const seatPrice = $(this).data('price');
+        $(document).on('click', '.seat.available', function() {
+            const $seat = $(this);
+            const seatNumber = $seat.data('seat');
+            const seatPrice = parseFloat($seat.data('price')) || 19.00;
+            const seatType = $seat.data('type') || 'regular';
             
-            if ($(this).hasClass('selected')) {
+            if ($seat.hasClass('selected')) {
                 // Deselect seat
-                $(this).removeClass('selected');
-                selectedSeats = selectedSeats.filter(seat => seat.number !== seatNumber);
+                deselectSeat($seat, seatNumber);
             } else {
-                // Select seat
-                $(this).addClass('selected');
-                selectedSeats.push({
-                    number: seatNumber,
-                    price: parseFloat(seatPrice),
-                    type: 'regular' // Could be determined by seat class
-                });
+                // Select seat (with limit check)
+                if (selectedSeats.length >= 8) {
+                    showNotification('Maximum 8 seats can be selected at once.', 'warning');
+                    return;
+                }
+                selectSeat($seat, seatNumber, seatPrice, seatType);
             }
             
             updateSeatSummary();
@@ -147,241 +223,336 @@ jQuery(document).ready(function($) {
         });
 
         $('.btn-fullscreen').on('click', function() {
-            toggleFullscreenSeatMap();
+            toggleFullscreen();
         });
 
-        // Continue to cart with multiple fallback methods
-        $('#continue-to-cart').on('click', function(e) {
+        // Continue to cart button
+        $(document).on('click', '#continue-to-cart', function(e) {
             e.preventDefault();
+            console.log('Proceeding to cart with seats:', selectedSeats);
             
             if (selectedSeats.length === 0) {
-                showErrorMessage('Please select at least one seat.');
+                showNotification('Please select at least one seat to continue.', 'error');
                 return;
             }
             
-            console.log('Continue to cart clicked', selectedSeats);
-            
-            // Method 1: Try AJAX save first
-            const bookingData = {
-                showtime_id: $('.seat-map').data('showtime-id'),
-                seats: selectedSeats,
-                timestamp: Date.now()
-            };
-            
-            // Show loading
-            $(this).prop('disabled', true).text('Saving...');
-            
-            saveBookingData(bookingData).then(() => {
-                console.log('Booking data saved, redirecting...');
-                redirectToCart();
-            }).catch((error) => {
-                console.error('AJAX save failed, trying alternative methods:', error);
-                
-                // Method 2: Use localStorage as backup
-                localStorage.setItem('cinema_booking_backup', JSON.stringify(bookingData));
-                
-                // Method 3: Use form submission as final fallback
-                $('#form-selected-seats').val(selectedSeats.map(seat => seat.number).join(','));
-                
-                setTimeout(() => {
-                    redirectToCart();
-                }, 500);
-            });
+            showSeatSelectionModal();
+        });
+
+        // Auto-save selection every 30 seconds
+        setInterval(autoSaveSeatSelection, 30000);
+    }
+
+    function selectSeat($seat, seatNumber, seatPrice, seatType) {
+        $seat.addClass('selected seat-animation');
+        selectedSeats.push({
+            number: seatNumber,
+            price: seatPrice,
+            type: seatType
         });
         
-        // Alternative click handler for double-safety
-        $(document).on('click', '#continue-to-cart', function(e) {
-            if ($(this).prop('disabled') || selectedSeats.length === 0) return;
-            
-            e.preventDefault();
-            e.stopPropagation();
-            
-            console.log('Alternative handler triggered');
-            redirectToCart();
-        });
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            $seat.removeClass('seat-animation');
+        }, 300);
+    }
+
+    function deselectSeat($seat, seatNumber) {
+        $seat.removeClass('selected');
+        selectedSeats = selectedSeats.filter(seat => seat.number !== seatNumber);
     }
 
     function updateSeatSummary() {
         const seatCount = selectedSeats.length;
-        const totalPrice = selectedSeats.reduce((total, seat) => total + seat.price, 0);
+        const seatNumbers = selectedSeats.map(seat => seat.number).join(', ');
         
+        // Update seat count display
         $('#seat-count').text(seatCount);
+        $('#selected-seat-numbers').text(seatNumbers || 'None selected');
         
-        // Update hidden form fields for fallback
-        $('#form-selected-seats').val(selectedSeats.map(seat => seat.number).join(','));
-        
+        // Update continue button
         const $continueBtn = $('#continue-to-cart');
         if (seatCount > 0) {
             $continueBtn.prop('disabled', false)
-                       .text(`NEXT: CART (${seatCount} seat${seatCount > 1 ? 's' : ''} - ${totalPrice.toFixed(2)})`);
+                       .removeClass('btn-disabled')
+                       .html(`NEXT: CART <small>(${seatCount} seat${seatCount !== 1 ? 's' : ''})</small>`);
         } else {
             $continueBtn.prop('disabled', true)
+                       .addClass('btn-disabled')
                        .text('SELECT A SEAT TO CONTINUE');
         }
+
+        // Update form fields for fallback
+        $('#form-selected-seats').val(seatNumbers);
     }
 
     function zoomSeatMap(factor) {
         const $seatMap = $('.seat-map');
-        const currentScale = $seatMap.data('scale') || 1;
-        const newScale = Math.max(0.5, Math.min(2, currentScale * factor));
+        currentZoom = Math.max(0.5, Math.min(2.5, currentZoom * factor));
         
-        $seatMap.css('transform', `scale(${newScale})`)
-                .data('scale', newScale);
+        $seatMap.css({
+            'transform': `scale(${currentZoom})`,
+            'transform-origin': 'center center'
+        });
+        
+        // Update button states
+        $('.btn-zoom-out').prop('disabled', currentZoom <= 0.5);
+        $('.btn-zoom-in').prop('disabled', currentZoom >= 2.5);
     }
 
-    function toggleFullscreenSeatMap() {
-        const $container = $('.seat-selection-main');
+    function toggleFullscreen() {
+        const element = $('.seat-selection-main')[0];
         
         if (!document.fullscreenElement) {
-            $container[0].requestFullscreen().catch(err => {
-                console.log('Fullscreen error:', err);
-            });
+            if (element.requestFullscreen) {
+                element.requestFullscreen().catch(() => {
+                    showNotification('Fullscreen not supported on this device.', 'info');
+                });
+            }
         } else {
-            document.exitFullscreen();
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
         }
     }
 
-    // Seat selection modal
-    function initSeatModal() {
-        // Show modal when seats are selected
-        function showSeatSelectionModal() {
-            const selectedSeatNumbers = selectedSeats.map(seat => seat.number).join(', ');
-            $('#modal-selected-seats').text(selectedSeatNumbers + '/Recliner Seat');
-            $('#seat-selection-modal').show();
+    function autoSaveSeatSelection() {
+        if (selectedSeats.length > 0 && $('.seat-map').length) {
+            const tempData = {
+                showtime_id: $('.seat-map').data('showtime-id'),
+                seats: selectedSeats,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('cinema_temp_booking', JSON.stringify(tempData));
         }
-
-        // Modal close
-        $('.modal-close').on('click', function() {
-            $(this).closest('.modal').hide();
-        });
-
-        // Add ticket buttons
-        $('.btn-add').on('click', function() {
-            const $ticketType = $(this).closest('.ticket-type');
-            const ticketPrice = parseFloat($ticketType.find('.price').text().replace('$', ''));
-            
-            // Add to booking data
-            addTicketToBooking(ticketPrice, 'Adult'); // Could get type from selection
-            
-            // Close modal and continue to cart
-            $('#seat-selection-modal').hide();
-            proceedToCart();
-        });
-
-        // Member linking buttons
-        $('.link-buttons .btn-dark').on('click', function() {
-            const linkType = $(this).text().toLowerCase();
-            handleMemberLinking(linkType);
-        });
     }
 
-    function addTicketToBooking(price, type) {
+    function loadSavedSeatSelection() {
+        const savedBooking = localStorage.getItem('cinema_temp_booking');
+        if (savedBooking && $('.seat-map').length) {
+            try {
+                const bookingData = JSON.parse(savedBooking);
+                const showtimeId = $('.seat-map').data('showtime-id');
+                
+                // Check if it's for the same showtime and within 30 minutes
+                if (bookingData.showtime_id == showtimeId && 
+                    (Date.now() - bookingData.timestamp) < 1800000) {
+                    
+                    // Restore seat selection
+                    selectedSeats = bookingData.seats || [];
+                    selectedSeats.forEach(seat => {
+                        $(`.seat[data-seat="${seat.number}"]`).addClass('selected');
+                    });
+                    updateSeatSummary();
+                    
+                    if (selectedSeats.length > 0) {
+                        showNotification(`${selectedSeats.length} seat(s) restored from previous session.`, 'info');
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading saved booking:', e);
+            }
+        }
+    }
+
+    // ===== SEAT SELECTION MODAL =====
+    function showSeatSelectionModal() {
+        if (selectedSeats.length === 0) return;
+        
+        const selectedSeatNumbers = selectedSeats.map(seat => seat.number).join(', ');
+        $('#modal-selected-seats').text(selectedSeatNumbers + '/Recliner Seat');
+        
+        const modal = $('#seat-selection-modal');
+        if (modal.length) {
+            modal.show();
+        } else {
+            createSeatSelectionModal();
+        }
+    }
+
+    function createSeatSelectionModal() {
+        const modalHTML = `
+            <div id="seat-selection-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>SELECT YOUR TICKET</h3>
+                        <button class="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="selected-seat-info">
+                            <p><strong>Seats Selected:</strong> <span id="modal-selected-seats"></span></p>
+                            <p class="booking-fee-notice">A $2.25 booking fee per ticket is included in the price of the ticket.</p>
+                        </div>
+                        <div class="ticket-options">
+                            <div class="ticket-type ora-member">
+                                <div class="ticket-details">
+                                    <div class="member-badge">
+                                        <span>Ora</span>
+                                        <small>Cinépolis Rewards Member</small>
+                                    </div>
+                                    <div class="ticket-info">
+                                        <select class="ticket-select">
+                                            <option value="adult">Adult</option>
+                                            <option value="child">Child</option>
+                                            <option value="senior">Senior</option>
+                                        </select>
+                                        <small>2 ticket types available</small>
+                                    </div>
+                                </div>
+                                <div class="ticket-price">
+                                    <span class="price">$21.25</span>
+                                    <small>($19.00 + $2.25 Booking Fee)</small>
+                                    <button class="btn-add" data-type="ora-adult" data-price="21.25">ADD</button>
+                                </div>
+                            </div>
+                            <div class="ticket-type">
+                                <div class="ticket-details">
+                                    <div class="ticket-info">
+                                        <span class="ticket-label">Adult</span>
+                                    </div>
+                                </div>
+                                <div class="ticket-price">
+                                    <span class="price">$21.25</span>
+                                    <small>($19.00 + $2.25 Booking Fee)</small>
+                                    <button class="btn-add" data-type="adult" data-price="21.25">ADD</button>
+                                </div>
+                            </div>
+                            <div class="ticket-type">
+                                <div class="ticket-details">
+                                    <div class="ticket-info">
+                                        <span class="ticket-label">Senior (60+)</span>
+                                    </div>
+                                </div>
+                                <div class="ticket-price">
+                                    <span class="price">$19.25</span>
+                                    <small>($17.00 + $2.25 Booking Fee)</small>
+                                    <button class="btn-add" data-type="senior" data-price="19.25">ADD</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="member-options">
+                            <h4>WOULD YOU LIKE TO PURCHASE TICKETS FOR OTHER MEMBERS?</h4>
+                            <p>Link a member</p>
+                            <div class="link-buttons">
+                                <button class="btn btn-dark" data-action="link">LINK</button>
+                                <button class="btn btn-dark" data-action="card">CARD</button>
+                                <button class="btn btn-dark" data-action="email">EMAIL</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('body').append(modalHTML);
+        showSeatSelectionModal(); // Show the newly created modal
+    }
+
+    // Handle ticket addition
+    $(document).on('click', '.btn-add', function() {
+        const ticketType = $(this).data('type') || 'adult';
+        const ticketPrice = parseFloat($(this).data('price')) || 21.25;
+        
+        // Create booking data
         bookingData = {
-            showtime_id: selectedShowtime.id,
+            showtime_id: $('.seat-map').data('showtime-id'),
             seats: selectedSeats,
-            tickets: selectedSeats.map(seat => ({
-                seat: seat.number,
-                price: price,
-                type: type
-            })),
-            total: selectedSeats.length * price
+            ticket_type: ticketType,
+            ticket_price: ticketPrice,
+            total: selectedSeats.length * ticketPrice
         };
+        
+        // Close modal and proceed to cart
+        $('#seat-selection-modal').hide();
+        proceedToCart();
+    });
+
+    function proceedToCart() {
+        const $continueBtn = $('#continue-to-cart');
+        const originalText = $continueBtn.html();
+        
+        $continueBtn.prop('disabled', true).html('<div class="btn-spinner"></div> Processing...');
+        
+        // Prepare data for saving
+        const saveData = {
+            showtime_id: $('.seat-map').data('showtime-id'),
+            seats: selectedSeats.map(seat => seat.number).join(','),
+            booking_data: JSON.stringify(bookingData)
+        };
+        
+        // Try to save booking data
+        saveBookingData(saveData)
+            .then(() => {
+                localStorage.removeItem('cinema_temp_booking');
+                redirectToCart();
+            })
+            .catch((error) => {
+                console.error('Save failed:', error);
+                // Try localStorage backup
+                localStorage.setItem('cinema_booking_backup', JSON.stringify(saveData));
+                redirectToCart();
+            })
+            .finally(() => {
+                $continueBtn.prop('disabled', false).html(originalText);
+            });
     }
 
     function redirectToCart() {
-        console.log('Attempting to redirect to cart...');
-        
-        const cartUrl = window.location.origin + '/cart/';
-        const cartUrlSlash = window.location.origin + '/cart';
-        
-        // Method 1: Standard location.href
-        try {
-            window.location.href = cartUrl;
-        } catch (error) {
-            console.error('Method 1 failed:', error);
-        }
-        
-        // Method 2: Backup with location.assign
-        setTimeout(() => {
-            try {
-                window.location.assign(cartUrl);
-            } catch (error) {
-                console.error('Method 2 failed:', error);
-            }
-        }, 100);
-        
-        // Method 3: Form submission fallback
-        setTimeout(() => {
-            try {
-                $('#cart-redirect-form').attr('action', cartUrl).submit();
-            } catch (error) {
-                console.error('Method 3 failed:', error);
-                
-                // Method 4: Manual redirect attempt
-                setTimeout(() => {
-                    window.open(cartUrl, '_self');
-                }, 100);
-            }
-        }, 200);
-        
-        // Method 5: Final fallback with different URL format
-        setTimeout(() => {
-            try {
-                window.location = cartUrlSlash;
-            } catch (error) {
-                console.error('All redirect methods failed:', error);
-                showErrorMessage('Unable to redirect. Please navigate to the cart page manually.');
-            }
-        }, 500);
+        window.location.href = '/cart/';
     }
 
-    // Cart functionality
+    // ===== CART FUNCTIONALITY =====
     function initCartFunctionality() {
         if (!$('.cart-container').length) return;
 
-        // Remove ticket item
-        $('.btn-remove').on('click', function() {
+        // Remove ticket functionality
+        $(document).on('click', '.btn-remove', function() {
             const seatToRemove = $(this).data('seat');
             const $ticketItem = $(this).closest('.ticket-item');
             
-            // Remove from UI
-            $ticketItem.remove();
-            
-            // Update totals
-            updateCartTotals();
-            
-            // Update server-side data
-            removeTicketFromBooking(seatToRemove);
-        });
-
-        // Promo code application
-        $('.btn-apply, .btn-apply-widget').on('click', function() {
-            const $input = $(this).siblings('input');
-            const promoCode = $input.val().trim();
-            
-            if (promoCode) {
-                applyPromoCode(promoCode);
+            if (confirm(`Remove seat ${seatToRemove} from your cart?`)) {
+                $ticketItem.addClass('removing');
+                
+                setTimeout(() => {
+                    $ticketItem.remove();
+                    updateCartTotals();
+                    removeTicketFromBooking(seatToRemove);
+                    
+                    if ($('.ticket-item').length === 0) {
+                        showEmptyCartMessage();
+                    }
+                }, 300);
             }
         });
 
         // Proceed to payment
-        $('#proceed-to-payment').on('click', function() {
-            window.location.href = '/payment/';
+        $(document).on('click', '#proceed-to-payment', function() {
+            const $btn = $(this);
+            $btn.prop('disabled', true).html('<div class="btn-spinner"></div> Loading...');
+            
+            setTimeout(() => {
+                window.location.href = '/payment/';
+            }, 500);
         });
 
-        // Expand/collapse sections
-        $('.btn-expand').on('click', function() {
-            const $section = $(this).closest('.rewards-section, .cart-summary, .movie-booking-summary');
+        // Toggle sections
+        $(document).on('click', '.btn-expand', function() {
+            const $section = $(this).closest('.rewards-section, .cart-items');
             const $details = $section.find('.cart-item-details, .ticket-details');
             
+            if ($details.length === 0) return;
+            
             if ($details.is(':visible')) {
-                $details.slideUp();
+                $details.slideUp(300);
                 $(this).text('⌄');
             } else {
-                $details.slideDown();
+                $details.slideDown(300);
                 $(this).text('⌃');
             }
         });
+
+        // Initialize promo code handling
+        initPromoCodeHandling();
     }
 
     function updateCartTotals() {
@@ -389,110 +560,193 @@ jQuery(document).ready(function($) {
         let subtotal = 0;
         
         $ticketItems.each(function() {
-            const price = parseFloat($(this).find('.ticket-price').text().replace('$', ''));
+            const priceText = $(this).find('.ticket-price').text().replace('$', '');
+            const price = parseFloat(priceText) || 0;
             subtotal += price;
         });
         
-        const bookingFee = $ticketItems.length * 2.25;
-        const total = subtotal + bookingFee;
+        const ticketCount = $ticketItems.length;
+        const bookingFee = ticketCount * 2.25;
+        const total = subtotal;
         
-        // Update pricing display
-        $('.pricing-details .pricing-row:not(.total)').eq(0).find('span:last').text(`$${subtotal.toFixed(2)}`);
-        $('.pricing-details .pricing-row:not(.total)').eq(1).find('span:last').text(`$${bookingFee.toFixed(2)}`);
-        $('.pricing-details .pricing-row.total span:last').text(`$${total.toFixed(2)}`);
-        $('.ticket-widget-header span:last').text(`${$ticketItems.length} ticket · $${total.toFixed(2)}`);
+        // Update displays
+        $('.pricing-row:contains("Subtotal") span:last').text(`$${(subtotal - bookingFee).toFixed(2)}`);
+        $('.pricing-row:contains("Booking Fee") span:last').text(`$${bookingFee.toFixed(2)}`);
+        $('.pricing-row.total span:last').text(`$${total.toFixed(2)}`);
+        $('.ticket-summary, .tickets-info span:last').text(`${ticketCount} ticket${ticketCount !== 1 ? 's' : ''} • $${total.toFixed(2)}`);
     }
 
-    function applyPromoCode(code) {
-        // Show loading state
-        showLoadingState('Applying promo code...');
-        
-        // Simulate API call
-        setTimeout(() => {
-            hideLoadingState();
+    function showEmptyCartMessage() {
+        const emptyHTML = `
+            <div class="empty-cart-message">
+                <div class="empty-cart-icon">
+                    <svg width="80" height="80" fill="#ccc" viewBox="0 0 24 24">
+                        <path d="M22 10V6c0-1.11-.9-2-2-2H4c-1.11 0-2 .89-2 2v4c1.11 0 2 .89 2 2s-.89 2-2 2v4c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2v-4c-1.11 0-2-.89-2-2s.89-2 2-2z"/>
+                    </svg>
+                </div>
+                <h3>Your cart is empty</h3>
+                <p>You haven't selected any tickets yet.</p>
+                <button class="btn btn-primary" onclick="history.back()">Select Seats</button>
+            </div>
+        `;
+        $('.cart-main').html(emptyHTML);
+        $('.cart-sidebar').hide();
+    }
+
+    // ===== PROMO CODE HANDLING =====
+    function initPromoCodeHandling() {
+        $(document).on('click', '.btn-apply, .btn-apply-widget, .apply-btn', function() {
+            const $btn = $(this);
+            const $input = $btn.siblings('input').first();
+            const promoCode = $input.val().trim();
             
-            // Simulate different promo code results
-            if (code.toLowerCase() === 'discount10') {
-                showSuccessMessage('10% discount applied!');
-                // Apply discount logic
+            if (!promoCode) {
+                showNotification('Please enter a promo code.', 'error');
+                $input.focus();
+                return;
+            }
+            
+            applyPromoCode(promoCode, $input, $btn);
+        });
+    }
+
+    function applyPromoCode(code, $input, $btn) {
+        const originalText = $btn.text();
+        $btn.prop('disabled', true).text('Applying...');
+        
+        setTimeout(() => {
+            const lowerCode = code.toLowerCase();
+            let success = false;
+            let message = '';
+            
+            if (lowerCode === 'discount10' || lowerCode === '10off') {
                 applyDiscount(0.1);
-            } else if (code.toLowerCase() === 'freebooking') {
-                showSuccessMessage('Booking fee waived!');
-                // Remove booking fee
+                message = '10% discount applied!';
+                success = true;
+            } else if (lowerCode === 'freebooking') {
                 removeBookingFee();
+                message = 'Booking fee waived!';
+                success = true;
+            } else if (lowerCode === 'student15') {
+                applyDiscount(0.15);
+                message = 'Student discount applied!';
+                success = true;
             } else {
-                showErrorMessage('Invalid promo code.');
+                message = 'Invalid promo code.';
+            }
+            
+            if (success) {
+                $input.val('').prop('disabled', true);
+                $btn.text('Applied').prop('disabled', true);
+                showNotification(message, 'success');
+            } else {
+                $btn.prop('disabled', false).text(originalText);
+                showNotification(message, 'error');
+                $input.focus().select();
             }
         }, 1500);
     }
 
-    // Payment form functionality
-    function initPaymentForm() {
+    function applyDiscount(percentage) {
+        const $subtotalRow = $('.pricing-row:contains("Subtotal")');
+        const currentSubtotal = parseFloat($subtotalRow.find('span:last').text().replace('$', ''));
+        const discountAmount = currentSubtotal * percentage;
+        
+        if ($('.pricing-row.discount').length === 0) {
+            const discountRow = `
+                <div class="pricing-row discount">
+                    <span>Discount (${(percentage * 100).toFixed(0)}%)</span>
+                    <span>-$${discountAmount.toFixed(2)}</span>
+                </div>
+            `;
+            $('.pricing-row.total').before(discountRow);
+        }
+        
+        updateCartTotals();
+    }
+
+    function removeBookingFee() {
+        $('.pricing-row:contains("Booking Fee") span:last').text('$0.00');
+        updateCartTotals();
+    }
+
+    // ===== PAYMENT SYSTEM =====
+    function initPaymentSystem() {
         if (!$('.payment-container').length) return;
 
-        // Payment method selection
-        $('.payment-section .payment-header').on('click', function() {
+        // Payment section toggles
+        $(document).on('click', '.payment-header', function() {
             const $section = $(this).parent();
+            const $form = $section.find('.payment-form');
+            const $expandBtn = $(this).find('.btn-expand');
             
-            // Toggle active state
-            $('.payment-section').removeClass('active');
-            $section.addClass('active');
-            
-            // Show/hide payment forms
-            $('.payment-form').hide();
-            $section.find('.payment-form').show();
-        });
-
-        // Card number formatting
-        $('#card_number').on('input', function() {
-            let value = $(this).val().replace(/\s/g, '').replace(/[^0-9]/gi, '');
-            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
-            $(this).val(formattedValue);
-            
-            // Detect card type and update icons
-            updateCardIcons(value);
-        });
-
-        // Expiry date formatting
-        $('#expiry_date').on('input', function() {
-            let value = $(this).val().replace(/\D/g, '');
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + ' / ' + value.substring(2, 4);
+            if ($section.hasClass('active')) {
+                $section.removeClass('active');
+                $form.slideUp();
+                $expandBtn.text('+');
+            } else {
+                $('.payment-section').removeClass('active');
+                $('.payment-form').slideUp();
+                $('.btn-expand').text('+');
+                
+                $section.addClass('active');
+                $form.slideDown();
+                $expandBtn.text('-');
             }
-            $(this).val(value);
         });
 
         // Form validation
-        $('#payment-form input, #payment-form select').on('input change', function() {
-            validatePaymentForm();
-        });
-
-        // Terms agreement
-        $('#terms-agreement').on('change', function() {
-            validatePaymentForm();
-        });
-
-        // Complete payment
-        $('#complete-payment').on('click', function() {
+        initPaymentFormValidation();
+        
+        // Payment processing
+        $(document).on('click', '#complete-payment', function() {
             if (validatePaymentForm()) {
                 processPayment();
             }
         });
     }
 
+    function initPaymentFormValidation() {
+        // Card number formatting
+        $(document).on('input', '#card_number', function() {
+            let value = $(this).val().replace(/\s/g, '').replace(/[^0-9]/gi, '');
+            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+            $(this).val(formatted);
+            updateCardIcons(value);
+            validatePaymentForm();
+        });
+
+        // Expiry date formatting
+        $(document).on('input', '#expiry_date', function() {
+            let value = $(this).val().replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.substring(0, 2) + ' / ' + value.substring(2, 4);
+            }
+            $(this).val(value);
+            validatePaymentForm();
+        });
+
+        // CVC formatting
+        $(document).on('input', '#security_code', function() {
+            $(this).val($(this).val().replace(/[^0-9]/g, ''));
+            validatePaymentForm();
+        });
+
+        // Terms checkbox
+        $(document).on('change', '#terms-agreement', validatePaymentForm);
+        $(document).on('change', '#country', validatePaymentForm);
+    }
+
     function updateCardIcons(cardNumber) {
         const $icons = $('.card-icons img');
-        
-        // Reset all icons
         $icons.css('opacity', '0.3');
         
-        // Detect card type
         if (cardNumber.startsWith('4')) {
-            $icons.filter('[alt="Visa"]').css('opacity', '1');
+            $icons.filter('[alt*="Visa"]').css('opacity', '1');
         } else if (cardNumber.startsWith('5') || cardNumber.startsWith('2')) {
-            $icons.filter('[alt="Mastercard"]').css('opacity', '1');
+            $icons.filter('[alt*="Master"]').css('opacity', '1');
         } else if (cardNumber.startsWith('3')) {
-            $icons.filter('[alt="American Express"]').css('opacity', '1');
+            $icons.filter('[alt*="American"], [alt*="Amex"]').css('opacity', '1');
         }
     }
 
@@ -510,185 +764,465 @@ jQuery(document).ready(function($) {
                        termsAccepted;
         
         $('#complete-payment').prop('disabled', !isValid);
-        
         return isValid;
     }
 
     function processPayment() {
-        // Show processing modal
-        $('#payment-processing-modal').show();
-        
-        // Collect payment data
-        const paymentData = {
-            card_number: $('#card_number').val(),
-            expiry_date: $('#expiry_date').val(),
-            security_code: $('#security_code').val(),
-            country: $('#country').val(),
-            booking_data: bookingData
-        };
+        showPaymentProcessingModal();
         
         // Simulate payment processing
         setTimeout(() => {
-            $('#payment-processing-modal').hide();
+            hidePaymentProcessingModal();
             
-            // Simulate payment success/failure
             if (Math.random() > 0.1) { // 90% success rate
-                showPaymentSuccess();
+                showPaymentSuccessModal();
             } else {
-                showPaymentError();
+                showPaymentErrorModal('Payment declined. Please check your card details.');
             }
-        }, 3000);
+        }, 3500);
     }
 
-    function showPaymentSuccess() {
+    function showPaymentProcessingModal() {
+        const modalHTML = `
+            <div id="payment-processing-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-body text-center">
+                        <div class="loading-spinner"></div>
+                        <h3>Processing Payment...</h3>
+                        <p>Please wait while we process your payment.</p>
+                        <div class="processing-steps">
+                            <div class="step active" id="step-1">
+                                <span class="step-icon">1</span>
+                                <span>Validating card details</span>
+                            </div>
+                            <div class="step" id="step-2">
+                                <span class="step-icon">2</span>
+                                <span>Authorizing payment</span>
+                            </div>
+                            <div class="step" id="step-3">
+                                <span class="step-icon">3</span>
+                                <span>Confirming booking</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('body').append(modalHTML);
+        $('#payment-processing-modal').show();
+        
+        // Animate processing steps
+        let currentStep = 0;
+        const stepInterval = setInterval(() => {
+            if (currentStep < 3) {
+                if (currentStep > 0) {
+                    $(`#step-${currentStep}`).removeClass('active').addClass('completed')
+                        .find('.step-icon').text('✓');
+                }
+                currentStep++;
+                if (currentStep <= 3) {
+                    $(`#step-${currentStep}`).addClass('active');
+                }
+            } else {
+                clearInterval(stepInterval);
+            }
+        }, 1000);
+    }
+
+    function hidePaymentProcessingModal() {
+        $('#payment-processing-modal').hide().remove();
+    }
+
+    function showPaymentSuccessModal() {
+        const modalHTML = `
+            <div id="payment-success-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Payment Successful!</h3>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="success-icon">
+                            <svg width="60" height="60" fill="#28a745" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                        </div>
+                        <h4>Booking Confirmed!</h4>
+                        <p>Your tickets have been booked successfully.</p>
+                        <div class="booking-confirmation">
+                            <p><strong>Confirmation Number:</strong> CIN-${Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                        </div>
+                        <p class="confirmation-note">You will receive a confirmation email shortly.</p>
+                        <div class="success-actions">
+                            <button class="btn btn-primary" onclick="window.location.href='/movies/'">Book Another Movie</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('body').append(modalHTML);
         $('#payment-success-modal').show();
         
-        // Clear booking data from session
+        // Clear booking data
         clearBookingData();
     }
 
-    function showPaymentError() {
-        showErrorMessage('Payment failed. Please try again.');
+    function showPaymentErrorModal(message) {
+        const modalHTML = `
+            <div id="payment-error-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Payment Failed</h3>
+                        <button class="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="error-icon">
+                            <svg width="60" height="60" fill="#dc3545" viewBox="0 0 24 24">
+                                <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
+                            </svg>
+                        </div>
+                        <h4>Payment could not be processed</h4>
+                        <p>${message}</p>
+                        <div class="error-actions">
+                            <button class="btn btn-primary" onclick="$('#payment-error-modal').hide().remove()">Try Again</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('body').append(modalHTML);
+        $('#payment-error-modal').show();
     }
 
-    // Modal functionality
-    function initModals() {
-        // Close modal on overlay click
-        $('.modal').on('click', function(e) {
+    // ===== USER INTERACTIONS =====
+    function initUserInteractions() {
+        // Add to watchlist
+        $(document).on('click', '.add-to-watchlist', function() {
+            const movieId = $(this).data('movie-id');
+            const $btn = $(this);
+            
+            if ($btn.hasClass('added')) return;
+            
+            addToWatchlist(movieId, $btn);
+        });
+
+        // Add to favorites
+        $(document).on('click', '.add-to-favorites', function() {
+            const movieId = $(this).data('movie-id');
+            const $btn = $(this);
+            
+            if ($btn.hasClass('added')) return;
+            
+            addToFavorites(movieId, $btn);
+        });
+
+        // Rate movie
+        $(document).on('click', '.rate-movie', function() {
+            const movieId = $(this).data('movie-id');
+            showRatingModal(movieId);
+        });
+
+        // Share movie
+        $(document).on('click', '.share-movie', function() {
+            shareMovie();
+        });
+
+        // Play trailer
+        $(document).on('click', '.play-trailer-btn, .play-button', function() {
+            const trailerUrl = $(this).data('trailer-url') || $('[data-trailer-url]').data('trailer-url');
+            if (trailerUrl) {
+                showTrailerModal(trailerUrl);
+            } else {
+                showNotification('Trailer not available for this movie.', 'info');
+            }
+        });
+    }
+
+    function addToWatchlist(movieId, $btn) {
+        $btn.prop('disabled', true).html('<div class="btn-spinner"></div> Adding...');
+        
+        // Simulate API call
+        setTimeout(() => {
+            $btn.removeClass('btn-loading').addClass('added').html(`
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                Added to Watchlist
+            `);
+            showNotification('Movie added to your watchlist!', 'success');
+        }, 1000);
+    }
+
+    function addToFavorites(movieId, $btn) {
+        $btn.prop('disabled', true).html('<div class="btn-spinner"></div> Adding...');
+        
+        setTimeout(() => {
+            $btn.removeClass('btn-loading').addClass('added').html(`
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                Added to Favorites
+            `);
+            showNotification('Movie added to your favorites!', 'success');
+        }, 1000);
+    }
+
+    function shareMovie() {
+        const movieTitle = $('.movie-hero-title, .movie-title a').first().text() || 'This Movie';
+        const movieUrl = window.location.href;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: movieTitle,
+                text: `Check out "${movieTitle}" - now playing at Cinépolis!`,
+                url: movieUrl
+            }).catch(err => console.log('Share cancelled'));
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(movieUrl).then(() => {
+                showNotification('Movie link copied to clipboard!', 'success');
+            });
+        } else {
+            showNotification('Sharing not supported on this device.', 'info');
+        }
+    }
+
+    function showRatingModal(movieId) {
+        const modalHTML = `
+            <div id="rating-modal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Rate This Movie</h3>
+                        <button class="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <div class="star-rating">
+                            <span class="star" data-rating="1">★</span>
+                            <span class="star" data-rating="2">★</span>
+                            <span class="star" data-rating="3">★</span>
+                            <span class="star" data-rating="4">★</span>
+                            <span class="star" data-rating="5">★</span>
+                        </div>
+                        <textarea class="form-control" placeholder="Write a review (optional)" style="margin: 20px 0; width: 100%; height: 100px; resize: vertical;"></textarea>
+                        <button class="btn btn-primary" id="submit-rating" style="width: 100%;">Submit Rating</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('body').append(modalHTML);
+        $('#rating-modal').show();
+
+        let selectedRating = 0;
+        
+        // Star rating interaction
+        $('.star').on('mouseenter', function() {
+            const rating = $(this).data('rating');
+            $('.star').removeClass('hover');
+            for (let i = 0; i < rating; i++) {
+                $('.star').eq(i).addClass('hover');
+            }
+        }).on('mouseleave', function() {
+            $('.star').removeClass('hover');
+            for (let i = 0; i < selectedRating; i++) {
+                $('.star').eq(i).addClass('selected');
+            }
+        }).on('click', function() {
+            selectedRating = $(this).data('rating');
+            $('.star').removeClass('selected');
+            for (let i = 0; i < selectedRating; i++) {
+                $('.star').eq(i).addClass('selected');
+            }
+        });
+
+        $('#submit-rating').on('click', function() {
+            if (selectedRating === 0) {
+                showNotification('Please select a rating.', 'error');
+                return;
+            }
+            
+            $(this).prop('disabled', true).html('<div class="btn-spinner"></div> Submitting...');
+            
+            setTimeout(() => {
+                $('#rating-modal').hide().remove();
+                $('.rate-movie').addClass('rated').html(`
+                    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    Rated ${selectedRating}/5
+                `);
+                showNotification('Thank you for your rating!', 'success');
+            }, 1500);
+        });
+    }
+
+    function showTrailerModal(url) {
+        const modalHTML = `
+            <div id="trailer-modal" class="modal">
+                <div class="modal-content trailer-modal-content">
+                    <button class="modal-close trailer-close">&times;</button>
+                    <div class="trailer-container">
+                        <video controls style="width: 100%; height: auto; max-height: 70vh;">
+                            <source src="${url}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                </div>
+            </div>
+        `;
+        $('body').append(modalHTML);
+        $('#trailer-modal').show();
+    }
+
+    // ===== MODAL SYSTEM =====
+    function initModalSystem() {
+        // Close modals
+        $(document).on('click', '.modal-close', function() {
+            $(this).closest('.modal').hide();
+        });
+
+        // Close on overlay click
+        $(document).on('click', '.modal', function(e) {
             if (e.target === this) {
                 $(this).hide();
             }
         });
 
-        // Close modal on escape key
+        // Close on escape key
         $(document).on('keydown', function(e) {
             if (e.key === 'Escape') {
                 $('.modal:visible').hide();
             }
         });
 
-        // View tickets button
-        $('#view-tickets').on('click', function() {
-            window.location.href = '/my-tickets/';
+        // Remove modals when hidden (except persistent ones)
+        $(document).on('hide', '.modal', function() {
+            const modalId = $(this).attr('id');
+            if (modalId !== 'seat-selection-modal') {
+                setTimeout(() => {
+                    $(this).remove();
+                }, 300);
+            }
+        });
+
+        // Handle member linking
+        $(document).on('click', '.link-buttons .btn-dark', function() {
+            const action = $(this).data('action');
+            showNotification(`${action.toUpperCase()} member linking is not available in demo mode.`, 'info');
         });
     }
 
-    // Utility functions
-    function saveBookingData(data) {
-        return new Promise((resolve, reject) => {
-            $.ajax({
-                url: cinema_ajax.ajax_url,
-                method: 'POST',
-                data: {
-                    action: 'cinema_seat_selection',
-                    nonce: cinema_ajax.nonce,
-                    showtime_id: data.showtime_id,
-                    seats: data.seats.map(seat => seat.number).join(','),
-                    booking_data: JSON.stringify(data)
-                },
-                success: function(response) {
-                    if (response.success) {
-                        resolve(response.data);
-                    } else {
-                        reject(response.data);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    reject(error);
+    // ===== UTILITY FUNCTIONS =====
+    function initUtilities() {
+        // Accessibility improvements
+        $(document).on('keydown', '.seat.available, .showtime-slot', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                $(this).click();
+            }
+        });
+
+        // Prevent accidental page refresh when seats are selected
+        $(window).on('beforeunload', function(e) {
+            if (selectedSeats.length > 0) {
+                const message = 'You have selected seats. Are you sure you want to leave?';
+                e.returnValue = message;
+                return message;
+            }
+        });
+
+        // Handle browser back/forward
+        window.addEventListener('popstate', function() {
+            if (selectedSeats.length > 0) {
+                const shouldLeave = confirm('You have selected seats. Are you sure you want to leave this page?');
+                if (!shouldLeave) {
+                    history.pushState(null, null, location.href);
                 }
+            }
+        });
+
+        // Clean up on successful booking
+        if (window.location.search.includes('success')) {
+            clearBookingData();
+        }
+
+        // Mobile responsive adjustments
+        handleMobileOptimizations();
+        
+        // Initialize tooltips
+        initTooltips();
+    }
+
+    function handleMobileOptimizations() {
+        let resizeTimeout;
+        $(window).on('resize', function() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if ($(window).width() < 768 && $('.seat-map').length) {
+                    currentZoom = Math.min(currentZoom, 0.8);
+                    $('.seat-map').css('transform', `scale(${currentZoom})`);
+                }
+            }, 250);
+        });
+
+        // Touch support
+        if ('ontouchstart' in window) {
+            $('.seat.available').on('touchstart', function() {
+                $(this).addClass('touch-active');
+            }).on('touchend', function() {
+                $(this).removeClass('touch-active');
             });
-        });
+        }
     }
 
-    function removeTicketFromBooking(seatNumber) {
-        $.ajax({
-            url: cinema_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'cinema_remove_seat',
-                nonce: cinema_ajax.nonce,
-                seat: seatNumber
-            },
-            success: function(response) {
-                if (!response.success) {
-                    showErrorMessage('Failed to remove seat. Please try again.');
-                }
+    function initTooltips() {
+        $(document).on('mouseenter', '[title]', function() {
+            const $elem = $(this);
+            const title = $elem.attr('title');
+            
+            if (!title) return;
+            
+            $elem.removeAttr('title');
+            
+            const tooltip = $(`<div class="tooltip">${title}</div>`);
+            $('body').append(tooltip);
+            
+            const offset = $elem.offset();
+            tooltip.css({
+                top: offset.top - tooltip.outerHeight() - 8,
+                left: offset.left + ($elem.outerWidth() / 2) - (tooltip.outerWidth() / 2)
+            }).fadeIn(200);
+            
+            $elem.data('tooltip', tooltip).data('original-title', title);
+        }).on('mouseleave', function() {
+            const $elem = $(this);
+            const tooltip = $elem.data('tooltip');
+            const originalTitle = $elem.data('original-title');
+            
+            if (tooltip) {
+                tooltip.fadeOut(200, function() {
+                    $(this).remove();
+                });
+            }
+            
+            if (originalTitle) {
+                $elem.attr('title', originalTitle);
             }
         });
-    }
-
-    function clearBookingData() {
-        $.ajax({
-            url: cinema_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'cinema_clear_booking',
-                nonce: cinema_ajax.nonce
-            }
-        });
-    }
-
-    function applyDiscount(percentage) {
-        const $totalElements = $('.pricing-row.total span:last, .ticket-widget-header span:last');
-        
-        $totalElements.each(function() {
-            const currentTotal = parseFloat($(this).text().replace(/[^0-9.]/g, ''));
-            const discountedTotal = currentTotal * (1 - percentage);
-            $(this).text(`${discountedTotal.toFixed(2)}`);
-        });
-        
-        // Add discount row to pricing breakdown
-        const discountAmount = parseFloat($('.pricing-row.total span:last').text().replace(/[^0-9.]/g, '')) * percentage;
-        const discountRow = `
-            <div class="pricing-row discount">
-                <span>Discount (${(percentage * 100).toFixed(0)}%)</span>
-                <span>-${discountAmount.toFixed(2)}</span>
-            </div>
-        `;
-        $('.pricing-row.total').before(discountRow);
-    }
-
-    function removeBookingFee() {
-        const $bookingFeeRow = $('.pricing-row').filter(function() {
-            return $(this).find('span:first').text().toLowerCase().includes('booking');
-        });
-        
-        $bookingFeeRow.find('span:last').text('$0.00');
-        
-        // Recalculate total
-        updateCartTotals();
-    }
-
-    function showLoadingState(message = 'Loading...') {
-        const loadingModal = `
-            <div id="loading-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-body text-center">
-                        <div class="loading-spinner"></div>
-                        <p>${message}</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('body').append(loadingModal);
-        $('#loading-modal').show();
-    }
-
-    function hideLoadingState() {
-        $('#loading-modal').remove();
-    }
-
-    function showSuccessMessage(message) {
-        showNotification(message, 'success');
-    }
-
-    function showErrorMessage(message) {
-        showNotification(message, 'error');
     }
 
     function showNotification(message, type = 'info') {
+        const icons = {
+            success: '<svg width="20" height="20" fill="#28a745" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+            error: '<svg width="20" height="20" fill="#dc3545" viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>',
+            warning: '<svg width="20" height="20" fill="#ffc107" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
+            info: '<svg width="20" height="20" fill="#17a2b8" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>'
+        };
+        
         const notification = `
             <div class="notification ${type}">
+                <div class="notification-icon">${icons[type] || icons.info}</div>
                 <span class="notification-message">${message}</span>
                 <button class="notification-close">&times;</button>
             </div>
@@ -701,344 +1235,115 @@ jQuery(document).ready(function($) {
         const $notification = $(notification);
         $('.notifications-container').append($notification);
         
-        // Auto remove after 5 seconds
+        setTimeout(() => $notification.addClass('notification-show'), 10);
+        
+        // Auto remove
         setTimeout(() => {
-            $notification.fadeOut(() => $notification.remove());
+            $notification.removeClass('notification-show').addClass('notification-hide');
+            setTimeout(() => $notification.remove(), 300);
         }, 5000);
         
         // Manual close
         $notification.find('.notification-close').on('click', function() {
-            $notification.fadeOut(() => $notification.remove());
+            $notification.removeClass('notification-show').addClass('notification-hide');
+            setTimeout(() => $notification.remove(), 300);
         });
     }
 
-    function handleMemberLinking(linkType) {
-        switch(linkType) {
-            case 'link':
-                showMemberLinkModal();
-                break;
-            case 'card':
-                showMemberCardModal();
-                break;
-            case 'email':
-                showMemberEmailModal();
-                break;
-        }
-    }
-
-    function showMemberLinkModal() {
-        const modal = `
-            <div id="member-link-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Link Member Account</h3>
-                        <button class="modal-close">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="member-link-form">
-                            <div class="form-group">
-                                <label>Member ID</label>
-                                <input type="text" class="form-control" placeholder="Enter member ID">
-                            </div>
-                            <div class="form-group">
-                                <label>Email</label>
-                                <input type="email" class="form-control" placeholder="Member email">
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-fullwidth">Link Account</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('body').append(modal);
-        $('#member-link-modal').show();
-    }
-
-    function showMemberCardModal() {
-        const modal = `
-            <div id="member-card-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Scan Member Card</h3>
-                        <button class="modal-close">&times;</button>
-                    </div>
-                    <div class="modal-body text-center">
-                        <div class="card-scanner">
-                            <div class="scanner-icon">📱</div>
-                            <p>Please scan your member card or enter the card number below:</p>
-                            <input type="text" class="form-control" placeholder="Card number">
-                            <button class="btn btn-primary" style="margin-top: 15px;">Scan Card</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('body').append(modal);
-        $('#member-card-modal').show();
-    }
-
-    function showMemberEmailModal() {
-        const modal = `
-            <div id="member-email-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Email Member Info</h3>
-                        <button class="modal-close">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Enter the email address of the member you'd like to purchase tickets for:</p>
-                        <div class="form-group">
-                            <input type="email" class="form-control" placeholder="Member email address">
-                        </div>
-                        <button class="btn btn-primary btn-fullwidth">Send Invitation</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('body').append(modal);
-        $('#member-email-modal').show();
-    }
-
-    // Movie action handlers
-    $('.add-to-watchlist').on('click', function() {
-        const movieId = getMovieIdFromPage();
-        addToWatchlist(movieId);
-    });
-
-    $('.rate-movie').on('click', function() {
-        const movieId = getMovieIdFromPage();
-        showRatingModal(movieId);
-    });
-
-    $('.add-to-favorites').on('click', function() {
-        const movieId = getMovieIdFromPage();
-        addToFavorites(movieId);
-    });
-
-    function getMovieIdFromPage() {
-        // Get movie ID from page data or URL
-        return $('body').data('movie-id') || window.location.pathname.match(/\/movies\/(\d+)/)?.[1];
-    }
-
-    function addToWatchlist(movieId) {
-        $.ajax({
-            url: cinema_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'cinema_add_to_watchlist',
-                nonce: cinema_ajax.nonce,
-                movie_id: movieId
-            },
-            success: function(response) {
-                if (response.success) {
-                    showSuccessMessage('Movie added to watchlist!');
-                    $('.add-to-watchlist').addClass('added').text('✓ Added to Watchlist');
-                } else {
-                    showErrorMessage('Failed to add to watchlist.');
-                }
-            }
-        });
-    }
-
-    function addToFavorites(movieId) {
-        $.ajax({
-            url: cinema_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'cinema_add_to_favorites',
-                nonce: cinema_ajax.nonce,
-                movie_id: movieId
-            },
-            success: function(response) {
-                if (response.success) {
-                    showSuccessMessage('Movie added to favorites!');
-                    $('.add-to-favorites').addClass('added').text('♥ Added to Favorites');
-                } else {
-                    showErrorMessage('Failed to add to favorites.');
-                }
-            }
-        });
-    }
-
-    function showRatingModal(movieId) {
-        const modal = `
-            <div id="rating-modal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>Rate This Movie</h3>
-                        <button class="modal-close">&times;</button>
-                    </div>
-                    <div class="modal-body text-center">
-                        <div class="star-rating">
-                            ${[1,2,3,4,5].map(i => `<span class="star" data-rating="${i}">★</span>`).join('')}
-                        </div>
-                        <textarea class="form-control" placeholder="Write a review (optional)" style="margin-top: 15px; height: 80px;"></textarea>
-                        <button class="btn btn-primary" id="submit-rating" style="margin-top: 15px;">Submit Rating</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('body').append(modal);
-        $('#rating-modal').show();
-
-        // Star rating interaction
-        let selectedRating = 0;
-        $('.star').on('mouseenter', function() {
-            const rating = $(this).data('rating');
-            $('.star').removeClass('hover');
-            $('.star:lt(' + rating + ')').addClass('hover');
-        }).on('mouseleave', function() {
-            $('.star').removeClass('hover');
-            if (selectedRating > 0) {
-                $('.star:lt(' + selectedRating + ')').addClass('selected');
-            }
-        }).on('click', function() {
-            selectedRating = $(this).data('rating');
-            $('.star').removeClass('selected');
-            $('.star:lt(' + selectedRating + ')').addClass('selected');
-        });
-
-        $('#submit-rating').on('click', function() {
-            if (selectedRating === 0) {
-                showErrorMessage('Please select a rating.');
+    // ===== AJAX FUNCTIONS =====
+    function saveBookingData(data) {
+        return new Promise((resolve, reject) => {
+            // Check if cinema_ajax is available
+            if (typeof cinema_ajax === 'undefined') {
+                console.warn('cinema_ajax not available, using localStorage backup');
+                localStorage.setItem('cinema_booking_data', JSON.stringify(data));
+                resolve({ success: true });
                 return;
             }
-            
-            const review = $(this).siblings('textarea').val();
-            submitMovieRating(movieId, selectedRating, review);
+
+            $.ajax({
+                url: cinema_ajax.ajax_url,
+                method: 'POST',
+                data: {
+                    action: 'cinema_seat_selection',
+                    nonce: cinema_ajax.nonce,
+                    ...data
+                },
+                timeout: 10000,
+                success: function(response) {
+                    if (response && response.success) {
+                        resolve(response.data);
+                    } else {
+                        reject(response ? response.data : 'Unknown error');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', error);
+                    reject(error);
+                }
+            });
         });
     }
 
-    function submitMovieRating(movieId, rating, review) {
+    function removeTicketFromBooking(seatNumber) {
+        if (typeof cinema_ajax === 'undefined') {
+            console.warn('cinema_ajax not available for seat removal');
+            return;
+        }
+
         $.ajax({
             url: cinema_ajax.ajax_url,
             method: 'POST',
             data: {
-                action: 'cinema_rate_movie',
+                action: 'cinema_remove_seat',
                 nonce: cinema_ajax.nonce,
-                movie_id: movieId,
-                rating: rating,
-                review: review
+                seat: seatNumber
             },
             success: function(response) {
-                if (response.success) {
-                    showSuccessMessage('Thank you for your rating!');
-                    $('#rating-modal').hide().remove();
-                    $('.rate-movie').addClass('rated').text('★ Rated');
-                } else {
-                    showErrorMessage('Failed to submit rating.');
+                if (!response || !response.success) {
+                    showNotification('Failed to remove seat. Please refresh the page.', 'error');
                 }
+            },
+            error: function() {
+                showNotification('Connection error. Please refresh the page.', 'error');
             }
         });
     }
 
-    // Trailer functionality
-    $('.play-trailer-btn, .play-button').on('click', function() {
-        const trailerUrl = $(this).data('trailer-url') || $('body').data('trailer-url');
-        if (trailerUrl) {
-            showTrailerModal(trailerUrl);
-        }
-    });
-
-    function showTrailerModal(url) {
-        const modal = `
-            <div id="trailer-modal" class="modal">
-                <div class="modal-content trailer-modal-content">
-                    <button class="modal-close trailer-close">&times;</button>
-                    <div class="trailer-container">
-                        <iframe src="${url}" frameborder="0" allowfullscreen></iframe>
-                    </div>
-                </div>
-            </div>
-        `;
-        $('body').append(modal);
-        $('#trailer-modal').show();
-    }
-
-    // Auto-save seat selection periodically
-    if ($('.seat-map').length) {
-        setInterval(function() {
-            if (selectedSeats.length > 0) {
-                const tempData = {
-                    showtime_id: $('.seat-map').data('showtime-id'),
-                    seats: selectedSeats,
-                    timestamp: Date.now()
-                };
-                localStorage.setItem('cinema_temp_booking', JSON.stringify(tempData));
-            }
-        }, 30000); // Save every 30 seconds
-    }
-
-    // Load saved seat selection
-    if ($('.seat-map').length) {
-        const savedBooking = localStorage.getItem('cinema_temp_booking');
-        if (savedBooking) {
-            const bookingData = JSON.parse(savedBooking);
-            const showtimeId = $('.seat-map').data('showtime-id');
-            
-            // Check if it's for the same showtime and within 30 minutes
-            if (bookingData.showtime_id === showtimeId && 
-                (Date.now() - bookingData.timestamp) < 1800000) {
-                
-                // Restore seat selection
-                selectedSeats = bookingData.seats;
-                bookingData.seats.forEach(seat => {
-                    $(`.seat[data-seat="${seat.number}"]`).addClass('selected');
-                });
-                updateSeatSummary();
-                
-                showNotification('Previous seat selection restored.', 'info');
-            }
-        }
-    }
-
-    // Clean up temp data when booking is completed
-    if (window.location.pathname.includes('/payment-success/')) {
+    function clearBookingData() {
         localStorage.removeItem('cinema_temp_booking');
+        localStorage.removeItem('cinema_booking_backup');
+        localStorage.removeItem('cinema_booking_data');
+        
+        if (typeof cinema_ajax !== 'undefined') {
+            $.ajax({
+                url: cinema_ajax.ajax_url,
+                method: 'POST',
+                data: {
+                    action: 'cinema_clear_booking',
+                    nonce: cinema_ajax.nonce
+                }
+            });
+        }
     }
 
-    // Search functionality (if search box exists)
-    $('#movie-search').on('input', function() {
-        const searchTerm = $(this).val().toLowerCase();
-        const $movieCards = $('.movie-card');
-        
-        if (searchTerm.length === 0) {
-            $movieCards.show();
-            return;
+    // ===== GLOBAL ERROR HANDLING =====
+    $(document).ajaxError(function(event, jqXHR, ajaxSettings, thrownError) {
+        if (jqXHR.status === 0) return; // Ignore aborted requests
+        console.error('Global AJAX Error:', thrownError);
+    });
+
+    // ===== INITIALIZATION COMPLETE =====
+    
+    // Show welcome message for first-time visitors
+    setTimeout(() => {
+        if (!localStorage.getItem('cinema_visited')) {
+            showNotification('Welcome to Cinépolis! Select your movie and enjoy the show.', 'info');
+            localStorage.setItem('cinema_visited', 'true');
         }
-        
-        $movieCards.each(function() {
-            const movieTitle = $(this).find('.movie-title').text().toLowerCase();
-            const movieGenre = $(this).find('.movie-genre').text().toLowerCase();
-            
-            if (movieTitle.includes(searchTerm) || movieGenre.includes(searchTerm)) {
-                $(this).show();
-            } else {
-                $(this).hide();
-            }
-        });
-    });
+    }, 2000);
 
-    // Accessibility improvements
-    $(document).on('keydown', '.seat.available', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            $(this).click();
-        }
-    });
+    // Log successful initialization
+    console.log('🎬 Cinema booking system fully loaded and ready!');
 
-    // Add loading states to buttons
-    $(document).on('click', '.btn-loading', function() {
-        const $btn = $(this);
-        const originalText = $btn.text();
-        
-        $btn.prop('disabled', true)
-            .html('<div class="btn-spinner"></div> Loading...')
-            .addClass('loading');
-        
-        // Restore button after operation (handled by specific functions)
-        $btn.data('original-text', originalText);
-    });
-
-    console.log('Cinema booking system initialized successfully!');
-});
+})(jQuery);
