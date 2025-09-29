@@ -185,11 +185,64 @@ add_action('save_post', 'cinema_save_meta_boxes');
 
 // Enqueue Scripts and Styles
 function cinema_enqueue_scripts() {
+    // CSS
     wp_enqueue_style('cinema-style', get_stylesheet_directory_uri() . '/cinema-style.css');
-    wp_enqueue_script('cinema-booking', get_stylesheet_directory_uri() . '/cinema-booking.js', array('jquery'), '1.0', true);
     
-    // Localize script for AJAX
-    wp_localize_script('cinema-booking', 'cinema_ajax', array(
+    // Common utilities - Load on all pages
+    wp_enqueue_script(
+        'cinema-common', 
+        get_stylesheet_directory_uri() . '/js/cinema-common.js', 
+        array('jquery'), 
+        '1.0', 
+        true
+    );
+    
+    // Movies page - Load on archive and single movie pages
+    if (is_post_type_archive('movies') || is_singular('movies')) {
+        wp_enqueue_script(
+            'cinema-movies', 
+            get_stylesheet_directory_uri() . '/js/cinema-movies.js', 
+            array('jquery', 'cinema-common'), 
+            '1.0', 
+            true
+        );
+    }
+    
+    // Seat selection page
+    if (is_page_template('page-seat-selection.php')) {
+        wp_enqueue_script(
+            'cinema-seat-selection', 
+            get_stylesheet_directory_uri() . '/js/cinema-seat-selection.js', 
+            array('jquery', 'cinema-common'), 
+            '1.0', 
+            true
+        );
+    }
+    
+    // Cart page
+    if (is_page_template('page-cart.php')) {
+        wp_enqueue_script(
+            'cinema-cart', 
+            get_stylesheet_directory_uri() . '/js/cinema-cart.js', 
+            array('jquery', 'cinema-common'), 
+            '1.0', 
+            true
+        );
+    }
+    
+    // Payment page
+    if (is_page_template('page-payment.php')) {
+        wp_enqueue_script(
+            'cinema-payment', 
+            get_stylesheet_directory_uri() . '/js/cinema-payment.js', 
+            array('jquery', 'cinema-common'), 
+            '1.0', 
+            true
+        );
+    }
+    
+    // Localize script for AJAX (available on all pages)
+    wp_localize_script('cinema-common', 'cinema_ajax', array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('cinema_nonce')
     ));

@@ -12,18 +12,35 @@ while (have_posts()) : the_post();
     $genre = get_post_meta($movie_id, '_movie_genre', true);
     $trailer_url = get_post_meta($movie_id, '_movie_trailer_url', true);
 ?>
-
+<div class="single-movie-container">
 <div class="movie-hero" data-trailer-url="<?php echo esc_url($trailer_url); ?>" data-movie-id="<?php echo $movie_id; ?>">
-    <?php if ($trailer_url) : ?>
+    <?php if ($trailer_url && filter_var($trailer_url, FILTER_VALIDATE_URL)) : ?>
         <div class="trailer-background">
-            <video autoplay muted loop playsinline>
-                <source src="<?php echo esc_url($trailer_url); ?>" type="video/mp4">
-            </video>
+            <?php 
+            // Check if it's a video file or YouTube URL
+            $is_video_file = preg_match('/\.(mp4|webm|ogg)$/i', $trailer_url);
+            if ($is_video_file) : 
+            ?>
+                <video autoplay muted loop playsinline>
+                    <source src="<?php echo esc_url($trailer_url); ?>" type="video/mp4">
+                </video>
+            <?php else : ?>
+                <!-- For YouTube URLs, show featured image as background -->
+                <?php if (has_post_thumbnail()) : ?>
+                    <?php the_post_thumbnail('full', array('style' => 'width: 100%; height: 100%; object-fit: cover;')); ?>
+                <?php endif; ?>
+            <?php endif; ?>
             <div class="trailer-overlay"></div>
         </div>
     <?php elseif (has_post_thumbnail()) : ?>
         <div class="trailer-background">
             <?php the_post_thumbnail('full', array('style' => 'width: 100%; height: 100%; object-fit: cover;')); ?>
+            <div class="trailer-overlay"></div>
+        </div>
+    <?php else : ?>
+        <!-- Fallback background -->
+        <div class="trailer-background">
+            <div class="placeholder-background" style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); width: 100%; height: 100%;"></div>
             <div class="trailer-overlay"></div>
         </div>
     <?php endif; ?>
@@ -93,6 +110,7 @@ while (have_posts()) : the_post();
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <div class="movie-details">

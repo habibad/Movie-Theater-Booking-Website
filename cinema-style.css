@@ -349,6 +349,10 @@ body {
     color: #ff9800;
 }
 
+.movie-container{
+    display: block;
+}
+
 /* Movie Detail Page Hero */
 .movie-hero {
     position: relative;
@@ -552,6 +556,10 @@ body {
     font-weight: 500;
 }
 
+.single-movie-container{
+    display: block;
+}
+
 /* Showtimes Section */
 .showtimes-section {
     padding: 60px 0;
@@ -564,6 +572,9 @@ body {
     margin-bottom: 30px;
     text-align: center;
     color: #1a1a1a;
+}
+.ast-container {
+    flex-direction: column !important;
 }
 
 .showtime-filters {
@@ -650,6 +661,18 @@ body {
     display: block;
     font-size: 12px;
     opacity: 0.9;
+}
+
+span.star {
+    cursor: pointer !important;
+}
+
+span.star.selected{
+    color: gold !important;
+}
+
+button.btn.btn-secondary.add-to-favorites.added{
+    background-color: rgb(238, 17, 65);
 }
 
 /* Seat Selection Styles */
@@ -1003,14 +1026,14 @@ body {
 .seat-row {
     display: flex;
     align-items: center;
-    justify-content: center;
+    /* justify-content: center; */
     margin-bottom: 15px;
     gap: 10px;
 }
 
 .row-label {
     width: 30px;
-    text-align: center;
+    /* text-align: center; */
     font-weight: 700;
     color: #666;
     font-size: 18px;
@@ -1022,7 +1045,7 @@ body {
 }
 
 .seat {
-    width: 36px;
+    width: 16px;
     height: 36px;
     border: 2px solid #ddd;
     border-radius: 8px 8px 4px 4px;
@@ -1174,20 +1197,34 @@ body {
 }
 
 /* Modal Styles */
-.modal {
+/* .modal {
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    overflow: auto;
     background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 9999;
     opacity: 0;
     visibility: hidden;
     transition: all 0.3s ease;
+} */
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.7);
 }
 
 .modal.show {
@@ -1195,7 +1232,7 @@ body {
     visibility: visible;
 }
 
-.modal-content {
+/* .modal-content {
     background: white;
     border-radius: 12px;
     max-width: 600px;
@@ -1205,6 +1242,17 @@ body {
     position: relative;
     transform: scale(0.9);
     transition: transform 0.3s ease;
+} */
+
+.modal-content {
+    background: #fff;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 800px;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
 .modal.show .modal-content {
@@ -1228,7 +1276,7 @@ body {
     letter-spacing: 0.8px;
 }
 
-.modal-close {
+/* .modal-close {
     background: none;
     border: none;
     font-size: 24px;
@@ -1242,6 +1290,18 @@ body {
     justify-content: center;
     border-radius: 50%;
     transition: all 0.3s ease;
+} */
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 2;
 }
 
 .modal-close:hover {

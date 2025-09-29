@@ -32,7 +32,8 @@ get_header(); ?>
                 $is_now_playing = ($release_date <= $current_date);
                 $status_class = $is_now_playing ? 'now-playing' : 'coming-soon';
         ?>
-        
+        <div class="movie-container">
+            
         <div class="movie-card <?php echo $status_class; ?>" data-movie-id="<?php echo $movie_id; ?>">
             <div class="movie-poster">
                 <a href="<?php echo get_permalink(); ?>">
@@ -96,6 +97,8 @@ get_header(); ?>
                 </div>
             </div>
         </div>
+        </div>
+        
         
         <?php 
             endwhile;
