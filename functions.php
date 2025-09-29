@@ -88,6 +88,8 @@ function movie_details_callback($post) {
     $release_date = get_post_meta($post->ID, '_movie_release_date', true);
     $genre = get_post_meta($post->ID, '_movie_genre', true);
     $trailer_url = get_post_meta($post->ID, '_movie_trailer_url', true);
+    $trailer_banner = get_post_meta($post->ID, '_movie_trailer_banner', true);
+    $background = get_post_meta($post->ID, '_movie_background', true);
     
     echo '<table class="form-table">';
     echo '<tr><th><label for="movie_director">Director</label></th>';
@@ -118,8 +120,125 @@ function movie_details_callback($post) {
     
     echo '<tr><th><label for="movie_trailer_url">Trailer URL</label></th>';
     echo '<td><input type="url" id="movie_trailer_url" name="movie_trailer_url" value="' . esc_attr($trailer_url) . '" size="50" /></td></tr>';
+
+    // Movie Background field
+    echo '<tr><th><label for="movie_background">Movie Background Image</label></th>';
+    echo '<td>';
+    echo '<div class="movie-background-field">';
+    echo '<input type="hidden" id="movie_background" name="movie_background" value="' . esc_attr($background) . '" />';
+    echo '<button type="button" class="button" id="upload_movie_background">Choose Image</button>';
+    echo '<button type="button" class="button" id="remove_movie_background" style="margin-left: 10px; display: ' . ($background ? 'inline-block' : 'none') . ';">Remove Image</button>';
+    echo '<div id="movie_background_preview" style="margin-top: 10px;">';
+    if ($background) {
+        echo '<img src="' . esc_url(wp_get_attachment_image_url($background, 'medium')) . '" style="max-width: 300px; height: auto;" />';
+    }
+    echo '</div>';
+    echo '<p class="description">Upload an image to be used as the movie background. This will be displayed behind the movie hero section.</p>';
+    echo '</div>';
+    echo '</td></tr>';
+    
+    // Trailer Banner field
+    echo '<tr><th><label for="movie_trailer_banner">Trailer Banner Image</label></th>';
+    echo '<td>';
+    echo '<div class="trailer-banner-field">';
+    echo '<input type="hidden" id="movie_trailer_banner" name="movie_trailer_banner" value="' . esc_attr($trailer_banner) . '" />';
+    echo '<button type="button" class="button" id="upload_trailer_banner">Choose Image</button>';
+    echo '<button type="button" class="button" id="remove_trailer_banner" style="margin-left: 10px; display: ' . ($trailer_banner ? 'inline-block' : 'none') . ';">Remove Image</button>';
+    echo '<div id="trailer_banner_preview" style="margin-top: 10px;">';
+    if ($trailer_banner) {
+        echo '<img src="' . esc_url(wp_get_attachment_image_url($trailer_banner, 'medium')) . '" style="max-width: 300px; height: auto;" />';
+    }
+    echo '</div>';
+    echo '<p class="description">Upload an image to be used as the trailer background banner. This will be displayed behind the movie hero section.</p>';
+    echo '</div>';
+    echo '</td></tr>';
     
     echo '</table>';
+    
+    // Add JavaScript for media uploaders
+    ?>
+    <script>
+    jQuery(document).ready(function($) {
+        // Movie Background Uploader
+        var mediaUploaderBackground;
+        
+        $('#upload_movie_background').click(function(e) {
+            e.preventDefault();
+            
+            if (mediaUploaderBackground) {
+                mediaUploaderBackground.open();
+                return;
+            }
+            
+            mediaUploaderBackground = wp.media.frames.file_frame = wp.media({
+                title: 'Choose Movie Background Image',
+                button: {
+                    text: 'Choose Image'
+                },
+                multiple: false,
+                library: {
+                    type: 'image'
+                }
+            });
+            
+            mediaUploaderBackground.on('select', function() {
+                var attachment = mediaUploaderBackground.state().get('selection').first().toJSON();
+                $('#movie_background').val(attachment.id);
+                $('#movie_background_preview').html('<img src="' + attachment.url + '" style="max-width: 300px; height: auto;" />');
+                $('#remove_movie_background').show();
+            });
+            
+            mediaUploaderBackground.open();
+        });
+        
+        $('#remove_movie_background').click(function(e) {
+            e.preventDefault();
+            $('#movie_background').val('');
+            $('#movie_background_preview').html('');
+            $(this).hide();
+        });
+
+        // Trailer Banner Uploader
+        var mediaUploaderTrailer;
+        
+        $('#upload_trailer_banner').click(function(e) {
+            e.preventDefault();
+            
+            if (mediaUploaderTrailer) {
+                mediaUploaderTrailer.open();
+                return;
+            }
+            
+            mediaUploaderTrailer = wp.media.frames.file_frame = wp.media({
+                title: 'Choose Trailer Banner Image',
+                button: {
+                    text: 'Choose Image'
+                },
+                multiple: false,
+                library: {
+                    type: 'image'
+                }
+            });
+            
+            mediaUploaderTrailer.on('select', function() {
+                var attachment = mediaUploaderTrailer.state().get('selection').first().toJSON();
+                $('#movie_trailer_banner').val(attachment.id);
+                $('#trailer_banner_preview').html('<img src="' + attachment.url + '" style="max-width: 300px; height: auto;" />');
+                $('#remove_trailer_banner').show();
+            });
+            
+            mediaUploaderTrailer.open();
+        });
+        
+        $('#remove_trailer_banner').click(function(e) {
+            e.preventDefault();
+            $('#movie_trailer_banner').val('');
+            $('#trailer_banner_preview').html('');
+            $(this).hide();
+        });
+    });
+    </script>
+    <?php
 }
 
 // Showtime Details Meta Box Callback
@@ -159,11 +278,11 @@ function showtime_details_callback($post) {
     echo '</table>';
 }
 
-// Save Meta Box Data
+// Updated Save Meta Box Data function to include Trailer Banner
 function cinema_save_meta_boxes($post_id) {
     // Movie meta
     if (isset($_POST['movie_details_nonce']) && wp_verify_nonce($_POST['movie_details_nonce'], 'movie_details_nonce')) {
-        $fields = array('director', 'producer', 'cast', 'duration', 'rating', 'release_date', 'genre', 'trailer_url');
+        $fields = array('director', 'producer', 'cast', 'duration', 'rating', 'release_date', 'genre', 'trailer_url', 'trailer_banner', 'background');
         foreach($fields as $field) {
             if (isset($_POST['movie_' . $field])) {
                 update_post_meta($post_id, '_movie_' . $field, sanitize_text_field($_POST['movie_' . $field]));
@@ -171,7 +290,7 @@ function cinema_save_meta_boxes($post_id) {
         }
     }
     
-    // Showtime meta
+    // Showtime meta (keep existing code)
     if (isset($_POST['showtime_details_nonce']) && wp_verify_nonce($_POST['showtime_details_nonce'], 'showtime_details_nonce')) {
         $fields = array('movie_id', 'screen', 'date', 'time', 'ticket_price');
         foreach($fields as $field) {
@@ -181,7 +300,21 @@ function cinema_save_meta_boxes($post_id) {
         }
     }
 }
+
 add_action('save_post', 'cinema_save_meta_boxes');
+
+
+// Make sure to enqueue media uploader scripts in admin
+function cinema_admin_scripts($hook) {
+    global $post;
+    
+    if ($hook == 'post-new.php' || $hook == 'post.php') {
+        if ('movies' === $post->post_type) {
+            wp_enqueue_media();
+        }
+    }
+}
+add_action('admin_enqueue_scripts', 'cinema_admin_scripts');
 
 // Enqueue Scripts and Styles
 function cinema_enqueue_scripts() {

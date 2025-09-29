@@ -14,9 +14,9 @@ body {
 
 /* Cinema Container */
 .cinema-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 50px;
 }
 
 /* Header Styles */
@@ -67,9 +67,9 @@ body {
 /* Movies Page Styles */
 .movies-header {
     text-align: center;
-    padding: 60px 0 40px;
+    padding: 130px 0 40px;
     background-color: #fff;
-    border-bottom: 1px solid #e9ecef;
+    /* border-bottom: 1px solid #e9ecef; */
 }
 
 .movies-title {
@@ -93,7 +93,7 @@ body {
 .movies-filter {
     background-color: #fff;
     padding: 0 0 30px;
-    border-bottom: 1px solid #e9ecef;
+    /* border-bottom: 1px solid #e9ecef; */
 }
 
 .filter-tabs {
@@ -157,7 +157,7 @@ body {
 /* Movies Grid */
 .movies-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 30px;
     padding: 40px 0;
     background-color: #fff;
@@ -197,7 +197,7 @@ body {
 .poster-placeholder {
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -278,16 +278,21 @@ body {
 }
 
 .movie-title a {
-    color: #1a1a1a;
+    color: #ffffff;
     text-decoration: none;
     font-size: 18px;
     font-weight: 600;
     line-height: 1.4;
     transition: color 0.3s ease;
+    text-transform: uppercase;
 }
 
 .movie-title a:hover {
     color: #0066ff;
+}
+
+.movie-card-details{
+    display: flex;
 }
 
 .movie-meta {
@@ -295,6 +300,7 @@ body {
     align-items: center;
     gap: 15px;
     margin-bottom: 8px;
+    width: 50%;
 }
 
 .rating-badge {
@@ -407,6 +413,7 @@ body {
     align-items: center;
     gap: 15px;
     line-height: 1.2;
+    color: #307fff;
 }
 
 .movie-hero-meta {

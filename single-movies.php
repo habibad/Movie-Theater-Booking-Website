@@ -11,108 +11,135 @@ while (have_posts()) : the_post();
     $release_date = get_post_meta($movie_id, '_movie_release_date', true);
     $genre = get_post_meta($movie_id, '_movie_genre', true);
     $trailer_url = get_post_meta($movie_id, '_movie_trailer_url', true);
+    $trailer_banner = get_post_meta($movie_id, '_movie_trailer_banner', true); // New field
 ?>
 <div class="single-movie-container">
-<div class="movie-hero" data-trailer-url="<?php echo esc_url($trailer_url); ?>" data-movie-id="<?php echo $movie_id; ?>">
-    <?php if ($trailer_url && filter_var($trailer_url, FILTER_VALIDATE_URL)) : ?>
-        <div class="trailer-background">
-            <?php 
-            // Check if it's a video file or YouTube URL
-            $is_video_file = preg_match('/\.(mp4|webm|ogg)$/i', $trailer_url);
-            if ($is_video_file) : 
-            ?>
-                <video autoplay muted loop playsinline>
-                    <source src="<?php echo esc_url($trailer_url); ?>" type="video/mp4">
-                </video>
-            <?php else : ?>
-                <!-- For YouTube URLs, show featured image as background -->
-                <?php if (has_post_thumbnail()) : ?>
-                    <?php the_post_thumbnail('full', array('style' => 'width: 100%; height: 100%; object-fit: cover;')); ?>
-                <?php endif; ?>
-            <?php endif; ?>
-            <div class="trailer-overlay"></div>
-        </div>
-    <?php elseif (has_post_thumbnail()) : ?>
-        <div class="trailer-background">
-            <?php the_post_thumbnail('full', array('style' => 'width: 100%; height: 100%; object-fit: cover;')); ?>
-            <div class="trailer-overlay"></div>
-        </div>
-    <?php else : ?>
-        <!-- Fallback background -->
-        <div class="trailer-background">
-            <div class="placeholder-background" style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); width: 100%; height: 100%;"></div>
-            <div class="trailer-overlay"></div>
-        </div>
-    <?php endif; ?>
-    
-    <div class="hero-content">
-        <div class="cinema-container">
-            <div class="movie-hero-info">
-                <h1 class="movie-hero-title">
-                    <?php the_title(); ?>
-                    <?php if ($rating) : ?>
-                        <?php echo get_movie_rating_badge($rating); ?>
+    <div class="movie-hero" data-trailer-url="<?php echo esc_url($trailer_url); ?>" data-movie-id="<?php echo $movie_id; ?>">
+        <?php if ($trailer_url && filter_var($trailer_url, FILTER_VALIDATE_URL)) : ?>
+            <div class="trailer-background">
+                <?php 
+                // Check if it's a direct video file
+                $is_video_file = preg_match('/\.(mp4|webm|ogg)$/i', $trailer_url);
+                if ($is_video_file) : 
+                ?>
+                    <video autoplay muted loop playsinline>
+                        <source src="<?php echo esc_url($trailer_url); ?>" type="video/mp4">
+                    </video>
+                <?php else : ?>
+                    <!-- For YouTube URLs or other links, show featured image as background -->
+                    <?php if (has_post_thumbnail()) : ?>
+                        <?php the_post_thumbnail('full', array('style' => 'width: 100%; height: 100%; object-fit: cover;')); ?>
                     <?php endif; ?>
-                </h1>
+                <?php endif; ?>
                 
-                <div class="movie-hero-meta">
-                    <?php if ($release_date) : ?>
-                        <span class="release-date">Release Date <?php echo date('l, F j, Y', strtotime($release_date)); ?></span>
-                    <?php endif; ?>
+                <!-- Modified trailer-overlay with background image from trailer banner -->
+                <div class="trailer-overlay" 
+                     <?php if ($trailer_banner) : ?>
+                     style="background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('<?php echo esc_url(wp_get_attachment_image_url($trailer_banner, 'full')); ?>'); background-size: cover; background-position: center; background-repeat: no-repeat;"
+                     <?php endif; ?>
+                ></div>
+            </div>
+        <?php elseif (has_post_thumbnail()) : ?>
+            <div class="trailer-background">
+                <?php the_post_thumbnail('full', array('style' => 'width: 100%; height: 100%; object-fit: cover;')); ?>
+                
+                <!-- Modified trailer-overlay with background image from trailer banner -->
+                <div class="trailer-overlay" 
+                     <?php if ($trailer_banner) : ?>
+                     style="background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('<?php echo esc_url(wp_get_attachment_image_url($trailer_banner, 'full')); ?>'); background-size: cover; background-position: center; background-repeat: no-repeat;"
+                     <?php endif; ?>
+                ></div>
+            </div>
+        <?php else : ?>
+            <!-- Fallback background -->
+            <div class="trailer-background">
+                <div class="placeholder-background" style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: #666;">
+                    <div style="text-align: center;">
+                        <svg width="80" height="80" fill="#666" viewBox="0 0 24 24">
+                            <path d="M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2z"/>
+                        </svg>
+                        <p style="margin: 10px 0 0 0; font-size: 18px;">Movie Poster</p>
+                    </div>
+                </div>
+                
+                <!-- Modified trailer-overlay with background image from trailer banner -->
+                <div class="trailer-overlay" 
+                     <?php if ($trailer_banner) : ?>
+                     style="background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('<?php echo esc_url(wp_get_attachment_image_url($trailer_banner, 'full')); ?>'); background-size: cover; background-position: center; background-repeat: no-repeat;"
+                     <?php endif; ?>
+                ></div>
+            </div>
+        <?php endif; ?>
+        
+        <div class="hero-content">
+            <div class="cinema-container">
+                <div class="movie-hero-info">
+                    <h1 class="movie-hero-title">
+                        <?php the_title(); ?>
+                        <?php if ($rating) : ?>
+                            <?php echo get_movie_rating_badge($rating); ?>
+                        <?php endif; ?>
+                    </h1>
                     
-                    <?php if ($genre && $release_date) : ?>
-                        <span class="divider">|</span>
-                    <?php endif; ?>
-                    
-                    <?php if ($genre) : ?>
-                        <span class="genre"><?php echo esc_html($genre); ?></span>
-                    <?php endif; ?>
-                    
-                    <?php if ($duration && $genre) : ?>
-                        <span class="divider">|</span>
-                    <?php endif; ?>
-                    
-                    <?php if ($duration) : ?>
-                        <span class="duration"><?php echo esc_html($duration); ?> min</span>
+                    <div class="movie-hero-meta">
+                        <?php if ($release_date) : ?>
+                            <span class="release-date">Release Date <?php echo date('l, F j, Y', strtotime($release_date)); ?></span>
+                        <?php endif; ?>
+                        
+                        <?php if ($genre && $release_date) : ?>
+                            <span class="divider">|</span>
+                        <?php endif; ?>
+                        
+                        <?php if ($genre) : ?>
+                            <span class="genre"><?php echo esc_html($genre); ?></span>
+                        <?php endif; ?>
+                        
+                        <?php if ($duration && $genre) : ?>
+                            <span class="divider">|</span>
+                        <?php endif; ?>
+                        
+                        <?php if ($duration) : ?>
+                            <span class="duration"><?php echo esc_html($duration); ?> min</span>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="movie-actions">
+                        <button class="btn btn-primary add-to-watchlist" data-movie-id="<?php echo $movie_id; ?>">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            Add to Watch List
+                        </button>
+                        
+                        <button class="btn btn-secondary rate-movie" data-movie-id="<?php echo $movie_id; ?>">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                            Rate
+                        </button>
+                        
+                        <button class="btn btn-secondary add-to-favorites" data-movie-id="<?php echo $movie_id; ?>">
+                            <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                            </svg>
+                            Add to Favorites
+                        </button>
+                    </div>
+
+                    <?php if ($trailer_url) : ?>
+                        <button class="play-trailer-btn" data-trailer-url="<?php echo esc_url($trailer_url); ?>">
+                            <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </button>
                     <?php endif; ?>
                 </div>
-
-                <div class="movie-actions">
-                    <button class="btn btn-primary add-to-watchlist" data-movie-id="<?php echo $movie_id; ?>">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                        Add to Watch List
-                    </button>
-                    
-                    <button class="btn btn-secondary rate-movie" data-movie-id="<?php echo $movie_id; ?>">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                        </svg>
-                        Rate
-                    </button>
-                    
-                    <button class="btn btn-secondary add-to-favorites" data-movie-id="<?php echo $movie_id; ?>">
-                        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                        </svg>
-                        Add to Favorites
-                    </button>
-                </div>
-
-                <?php if ($trailer_url) : ?>
-                    <button class="play-trailer-btn" data-trailer-url="<?php echo esc_url($trailer_url); ?>">
-                        <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                        </svg>
-                    </button>
-                <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
-</div>
 
+<!-- Rest of the movie details section remains the same -->
 <div class="movie-details">
     <div class="cinema-container">
         <div class="movie-content">
